@@ -106,4 +106,4 @@ if __name__ == "__main__":
     test_df = get_dataframe("data/test.pkl")
     processed_df = get_processed_df(test_df)
 
-    processed_df.to_csv("test.csv", index=False)
+    processed_df.to_csv("data/test.csv", index=False)
