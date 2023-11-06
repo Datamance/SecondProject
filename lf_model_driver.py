@@ -33,7 +33,7 @@ def get_training_df(file_path: Union[Path, str] = "data/training.pkl"):
 if __name__ == "__main__":
     clinical_longformer_model_name = "yikuan8/Clinical-Longformer"
     # dataframe = get_training_df()
-    dataframe = pd.read_csv("training_processed_lite.csv").rename(
+    dataframe = pd.read_csv("data/training_processed_lite.csv").rename(
         columns={"final_pass_processing": "text"}
     )
     print(dataframe.head(5))
@@ -48,18 +48,18 @@ if __name__ == "__main__":
         problem_type="regression",
         torch_dtype=torch.float32,
         # quantization_config=quantization_config,
-    ).to(device=MPS_DEVICE, dtype=torch.float32)
-    # TODO: LoRA when your model is at least scoring well.
+    ).to(device=DEFAULT_DEVICE, dtype=torch.float32)
+    # TODO: Figure out why LoRA config doesn't respect num_labels=1
     # peft_config = peft.LoraConfig(
     #     target_modules=[
     #         "dense",
     #         "out_proj",
-    #         "query",
-    #         "key",
-    #         "value",
-    #         "query_global",
-    #         "key_global",
-    #         "value_global",
+    #         # "query",
+    #         # "key",
+    #         # "value",
+    #         # "query_global",
+    #         # "key_global",
+    #         # "value_global",
     #     ],
     #     task_type=peft.TaskType.SEQ_CLS,
     #     inference_mode=False,

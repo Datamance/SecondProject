@@ -3,6 +3,7 @@ from typing import Callable, Sequence, Type, Optional, Union
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass
+import gc
 
 import torch
 import evaluate
@@ -13,6 +14,7 @@ import transformers
 import sklearn
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import precision_score, recall_score, f1_score
+from transformers import TrainingArguments, TrainerState, TrainerControl
 
 from base import BaseARDSDataset, DataManager
 
@@ -25,7 +27,7 @@ DEFAULT_EPOCH_COUNT = 2
 DEFAULT_WEIGHT_DECAY = 0.01
 DEFAULT_PROMPT_LENGTH = 4000  # Question Length, in tokens
 DEFAULT_TARGET_LENGTH = 5  # Target Length ("Yes" or "No")
-DEFAULT_BATCH_SIZE = 1
+DEFAULT_BATCH_SIZE = 2
 DEFAULT_TEST_FRACTION = 0.2
 
 BINARY_CLASSIFIER_PROMPT_TEMPLATE = "Text: {text}\nCategory: [Yes/No]".format
@@ -311,18 +313,35 @@ def compute_metrics(pred):
     preds = pred.predictions.argmax(-1)
 
     # Calculate precision, recall, and F1-score
-    precision = precision_score(labels, preds, average="weighted")
-    recall = recall_score(labels, preds, average="weighted")
+    # precision = precision_score(labels, preds, average="weighted")
+    # recall = recall_score(labels, preds, average="weighted")
     f1 = f1_score(labels, preds, average="weighted")
 
-    return {"precision": precision, "recall": recall, "f1": f1}
+    return {
+        # "precision": precision,
+        # "recall": recall,
+        "f1": f1
+    }
+
+
+class MpsCacheClearCallback(transformers.TrainerCallback):
+    def on_epoch_end(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs,
+    ):
+        gc.collect()
+        torch.mps.empty_cache()
+        gc.collect()
 
 
 def get_trainer(
     dataframe: pd.DataFrame,
     model: Union[transformers.PreTrainedModel, peft.PeftModel],
     tokenizer: transformers.PreTrainedTokenizerBase,
-    save_location: str = "models/longformer_classifier",
+    save_location: str = "models/longformer_classifier_1",
     learning_rate: float = DEFAULT_LEARNING_RATE,
     prompt_length: int = DEFAULT_PROMPT_LENGTH,
     target_length: int = DEFAULT_TARGET_LENGTH,
@@ -346,12 +365,17 @@ def get_trainer(
         metric_for_best_model="f1",
         load_best_model_at_end=True,
         weight_decay=weight_decay,
+        gradient_accumulation_steps=2,
+        # skip_memory_metrics=False,  # breaks with MPS
+        # log_level="debug",
         class_weights=weights,
     )
 
     # 2. Construct data loaders
     train_data, val_data = train_test_split(
-        dataframe, test_size=test_fraction, stratify=dataframe.label, random_state=42
+        dataframe,
+        test_size=test_fraction,
+        stratify=dataframe.label,
     )
     # TODO: Find out if we need to modify DataLoaderShard.BatchSampler
     #    it looks like even when we override _get_train_sampler, a SequentialSampler is loaded.
@@ -372,6 +396,7 @@ def get_trainer(
         train_dataset=training_dataset,
         eval_dataset=validation_dataset,
         compute_metrics=compute_metrics,
+        callbacks=[MpsCacheClearCallback()],
     )
 
     return trainer

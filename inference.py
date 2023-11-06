@@ -18,10 +18,15 @@ BASE_LONGFORMER_TOKENIZER = transformers.AutoTokenizer.from_pretrained(
     BASE_LONGFORMER_MODEL_NAME
 )
 
-FINETUNED_LONGFORMER_NAME = "models/longformer_classifier/checkpoint-13088"
+# Change this checkpoint name to either the HF repo, or local checkpoint that you want to target.
+# CHECKPOINT_NAME = "Datamance/Longformer-ARDS-classifier"
+# CHECKPOINT_NAME = "models/longformer_classifier/checkpoint-13088"
+CHECKPOINT_NAME = "models/longformer_classifier_1/checkpoint-3272"
+
+FINETUNED_LONGFORMER_NAME = CHECKPOINT_NAME
 FINETUNED_LONGFORMER_MODEL = (
     transformers.AutoModelForSequenceClassification.from_pretrained(
-        "models/longformer_classifier/checkpoint-13088/", device_map="mps"
+        CHECKPOINT_NAME, device_map="auto"
     )
 )
 
@@ -30,7 +35,7 @@ def predict(
     test_df_path: Union[Path, str] = "data/test.csv",
     tokenizer: transformers.PreTrainedTokenizerBase = BASE_LONGFORMER_TOKENIZER,
     model: transformers.PreTrainedModel = FINETUNED_LONGFORMER_MODEL,
-    cutoff_probability: Optional[float] = 0.0004,
+    cutoff_probability: Optional[float] = 0.0010,
 ):
     test_df = pd.read_csv(test_df_path)
     # Assume we have processed this data. If we haven't, this should bork.
@@ -48,7 +53,7 @@ def predict(
         for idx, note in enumerate(notes_processed):
             # No restrictions on tokenizer here! Preprocessing should have taken care of all of that,
             # so we want noisy warnings here.
-            inputs = tokenizer(note, return_tensors="pt").to(device=MPS_DEVICE)
+            inputs = tokenizer(note, return_tensors="pt").to(device=DEFAULT_DEVICE)
             outputs = model(**inputs)
             probability = torch.sigmoid(outputs.logits).item()
             probabilities.append(probability)
@@ -70,4 +75,4 @@ def predict(
 
 if __name__ == "__main__":
     predictions = predict()
-    predictions.decision.to_csv("output/test_result.csv", index=False, header=False)
+    predictions.decision.to_csv("output/test_result_1.csv", index=False, header=False)

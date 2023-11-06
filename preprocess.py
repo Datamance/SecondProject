@@ -11,7 +11,7 @@ import torch
 import transformers
 from cleantext import clean
 
-MPS_DEVICE = torch.device("mps")
+DEFAULT_DEVICE = MPS_DEVICE = torch.device("mps")
 nltk.download("punkt")
 
 
@@ -22,7 +22,7 @@ EXTRACTIVE_SUMMARIZER = transformers.pipeline(
         "NotXia/pubmedbert-bio-ext-summ"
     ),
     trust_remote_code=True,
-    device=MPS_DEVICE,
+    device=DEFAULT_DEVICE,
 )
 
 
